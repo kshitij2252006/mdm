@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SwiftDelivery — Profile</title>
+  <link rel="stylesheet" href="../Css/base.css" />
+</head>
+<body>
+
+<div class="layout" id="layout">
+  <div class="main-wrap" id="main-wrap">
+    <div class="content" id="content">
+      <div class="page-shell">
+        <div class="page-shell__header">
+          <div>
+            <h1>Profile</h1>
+            <p>Update the user details shown in the dashboard and manage your current session.</p>
+          </div>
+          <a class="btn" href="index.html">Back to Dashboard</a>
+        </div>
+
+        <form class="form-grid" id="profileForm">
+          <section class="form-card">
+            <h2 class="form-card__title">Profile Details</h2>
+            <div class="field-grid">
+              <div class="field">
+                <label for="profileName">Display Name</label>
+                <input id="profileName" name="profileName" type="text" required />
+              </div>
+              <div class="field">
+                <label for="profileRole">Role</label>
+                <input id="profileRole" name="profileRole" type="text" required />
+              </div>
+              <div class="field field--full">
+                <label for="profileEmail">Email</label>
+                <input id="profileEmail" name="profileEmail" type="email" required />
+              </div>
+              <div class="field field--full">
+                <label for="profileAvatar">Avatar URL</label>
+                <input id="profileAvatar" name="profileAvatar" type="url" />
+              </div>
+            </div>
+            <div class="form-actions">
+              <p class="status-message" id="profileStatus">Edit your details and save them.</p>
+              <button class="btn btn-primary" type="submit">Save Changes</button>
+            </div>
+          </section>
+
+          <section class="form-card">
+            <h2 class="form-card__title">Session</h2>
+            <p style="font-size:14px;color:var(--t-secondary)">Logging out clears the saved API token from this browser.</p>
+            <div class="form-actions">
+              <span></span>
+              <button class="btn" id="logoutBtn" type="button">Log Out</button>
+            </div>
+          </section>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="../js/ui.js"></script>
+<script>
+  const PROFILE_STORAGE_KEY = 'swift_profile';
+
+  function loadProfile() {
+    if (window.UI && typeof UI.getProfile === 'function') {
+      return UI.getProfile();
+    }
+    return {
+      name: 'SwiftDelivery HQ',
+      role: 'Logistics Pro',
+      email: 'team@swiftdelivery.local',
+      avatar: 'https://i.pravatar.cc/80?img=12',
+    };
+  }
+
+  function saveProfile(profile) {
+    localStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(profile));
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    if (!localStorage.getItem('token')) { window.location.replace('auth.html'); return; }
+    UI.render('', 'Search settings or pages...');
+
+    const profile = loadProfile();
+    const form = document.getElementById('profileForm');
+    const status = document.getElementById('profileStatus');
+
+    document.getElementById('profileName').value = profile.name;
+    document.getElementById('profileRole').value = profile.role;
+    document.getElementById('profileEmail').value = profile.email;
+    document.getElementById('profileAvatar').value = profile.avatar;
+
+    form.addEventListener('submit', (event) => {
+      event.preventDefault();
+      const nextProfile = {
+        name: document.getElementById('profileName').value.trim(),
+        role: document.getElementById('profileRole').value.trim(),
+        email: document.getElementById('profileEmail').value.trim(),
+        avatar: document.getElementById('profileAvatar').value.trim() || profile.avatar,
+      };
+      saveProfile(nextProfile);
+      status.textContent = 'Profile updated. The sidebar and top bar will use the new values.';
+      status.className = 'status-message is-success';
+    });
+
+    document.getElementById('logoutBtn').addEventListener('click', () => {
+      localStorage.removeItem('token');
+      window.location.replace('auth.html');
+    });
+  });
+</script>
+</body>
+</html>

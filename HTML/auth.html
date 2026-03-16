@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SwiftDelivery — Sign In</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet" />
+  <link rel="stylesheet" href="../Css/auth.css" />
+</head>
+<body>
+
+  <!-- ── Animated background ── -->
+  <div class="bg-scene">
+    <div class="bg-grid"></div>
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+    <div class="orb orb-3"></div>
+    <div class="particles" id="particles"></div>
+  </div>
+
+  <!-- ── Floating route lines ── -->
+  <svg class="route-svg" viewBox="0 0 1440 900" preserveAspectRatio="none">
+    <path class="route-path" d="M0,450 C200,200 400,700 720,350 S1100,100 1440,450" />
+    <path class="route-path route-path--2" d="M0,200 C300,500 600,100 900,400 S1200,600 1440,200" />
+    <path class="route-path route-path--3" d="M0,700 C250,400 550,750 800,350 S1150,500 1440,700" />
+    <circle class="route-dot" r="5"><animateMotion dur="8s" repeatCount="indefinite" path="M0,450 C200,200 400,700 720,350 S1100,100 1440,450"/></circle>
+    <circle class="route-dot route-dot--2" r="4"><animateMotion dur="12s" repeatCount="indefinite" path="M0,200 C300,500 600,100 900,400 S1200,600 1440,200"/></circle>
+    <circle class="route-dot route-dot--3" r="3"><animateMotion dur="10s" repeatCount="indefinite" path="M0,700 C250,400 550,750 800,350 S1150,500 1440,700"/></circle>
+  </svg>
+
+  <!-- ── Main layout ── -->
+  <div class="auth-layout">
+
+    <!-- Left panel -->
+    <div class="auth-panel auth-panel--left">
+      <div class="brand">
+        <div class="brand__logo">
+          <span class="material-symbols-rounded">local_shipping</span>
+        </div>
+        <span class="brand__name">SwiftDelivery</span>
+      </div>
+
+      <div class="panel-content">
+        <div class="tagline">
+          <h1 class="tagline__heading">The Precision<br/>Ledger for<br/><span class="tagline__accent">Global Momentum.</span></h1>
+          <p class="tagline__sub">Experience logistics as an editorial masterpiece. Monitor every pulse of your supply chain with high-fidelity clarity.</p>
+        </div>
+
+        <!-- Live pulse card -->
+        <div class="pulse-card">
+          <div class="pulse-card__header">
+            <span class="pulse-label">LIVE PULSE</span>
+            <span class="pulse-dot"></span>
+          </div>
+          <div class="pulse-card__stat">
+            <span class="pulse-num" id="pulseNum">0</span>
+            <span class="pulse-delta" id="pulseDelta">+0%</span>
+          </div>
+          <div class="pulse-card__sub">Active Shipments</div>
+          <div class="pulse-card__bar">
+            <div class="pulse-bar-fill" id="pulseBar"></div>
+          </div>
+        </div>
+
+        <!-- Trust badges -->
+        <div class="trust">
+          <div class="trust__avatars">
+            <div class="trust__avatar" style="background:#6366f1">A</div>
+            <div class="trust__avatar" style="background:#8b5cf6">R</div>
+            <div class="trust__avatar" style="background:#06b6d4">M</div>
+          </div>
+          <span class="trust__text">Trusted by <strong>500+</strong> enterprises</span>
+        </div>
+      </div>
+
+      <div class="panel-footer">
+        <span>ISO 27001 CERTIFIED</span>
+        <span class="dot">·</span>
+        <span>SECURE DATA ENCRYPTION</span>
+        <span class="dot">·</span>
+        <span>24/7 GLOBAL SUPPORT</span>
+      </div>
+    </div>
+
+    <!-- Right panel — form card -->
+    <div class="auth-panel auth-panel--right">
+      <div class="form-card">
+
+        <!-- Tab switcher -->
+        <div class="auth-tabs">
+          <button class="auth-tab auth-tab--active" id="tabLogin" onclick="switchTab('login')">Sign In</button>
+          <button class="auth-tab" id="tabRegister" onclick="switchTab('register')">Create Account</button>
+          <div class="auth-tab-indicator" id="tabIndicator"></div>
+        </div>
+
+        <!-- ── LOGIN FORM ── -->
+        <div class="auth-form" id="formLogin">
+          <div class="form-header">
+            <h2 class="form-title">Welcome back</h2>
+            <p class="form-sub">Sign in to your SwiftDelivery workspace.</p>
+          </div>
+
+          <div id="loginError" class="auth-alert auth-alert--error" style="display:none"></div>
+          <div id="loginSuccess" class="auth-alert auth-alert--success" style="display:none"></div>
+
+          <div class="field-group">
+            <label class="field-label">Company Email</label>
+            <div class="field-input-wrap">
+              <span class="material-symbols-rounded field-icon">mail</span>
+              <input type="email" id="loginEmail" class="field-input" placeholder="name@company.com" autocomplete="email" />
+            </div>
+          </div>
+
+          <div class="field-group">
+            <label class="field-label">Password</label>
+            <div class="field-input-wrap">
+              <span class="material-symbols-rounded field-icon">lock</span>
+              <input type="password" id="loginPassword" class="field-input" placeholder="••••••••" autocomplete="current-password" />
+              <button type="button" class="field-eye" onclick="togglePw('loginPassword', this)">
+                <span class="material-symbols-rounded">visibility</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="field-row">
+            <label class="checkbox-label">
+              <input type="checkbox" id="rememberMe" />
+              <span>Remember me</span>
+            </label>
+            <button type="button" class="link-btn">Forgot password?</button>
+          </div>
+
+          <button class="auth-btn" id="loginBtn" onclick="handleLogin()">
+            <span class="btn-text">Sign In</span>
+            <span class="material-symbols-rounded btn-icon">arrow_forward</span>
+            <div class="btn-loader" style="display:none"><div class="spinner"></div></div>
+          </button>
+
+          <div class="auth-divider"><span>or continue with</span></div>
+
+          <div class="social-row">
+            <button class="social-btn" onclick="demoLogin()">
+              <span class="material-symbols-rounded">admin_panel_settings</span>
+              Demo Admin
+            </button>
+            <button class="social-btn" onclick="guestLogin()">
+              <span class="material-symbols-rounded">person</span>
+              Guest View
+            </button>
+          </div>
+
+          <p class="auth-switch">Don't have an account? <button class="link-btn" onclick="switchTab('register')">Create one →</button></p>
+        </div>
+
+        <!-- ── REGISTER FORM ── -->
+        <div class="auth-form" id="formRegister" style="display:none">
+          <div class="form-header">
+            <h2 class="form-title">Create your account</h2>
+            <p class="form-sub">Join the kinetic ledger and redefine your logistics.</p>
+          </div>
+
+          <div id="registerError" class="auth-alert auth-alert--error" style="display:none"></div>
+          <div id="registerSuccess" class="auth-alert auth-alert--success" style="display:none"></div>
+
+          <div class="field-row field-row--half">
+            <div class="field-group">
+              <label class="field-label">Full Name</label>
+              <div class="field-input-wrap">
+                <span class="material-symbols-rounded field-icon">person</span>
+                <input type="text" id="regName" class="field-input" placeholder="John Doe" autocomplete="name" />
+              </div>
+            </div>
+            <div class="field-group">
+              <label class="field-label">Company Name</label>
+              <div class="field-input-wrap">
+                <span class="material-symbols-rounded field-icon">business</span>
+                <input type="text" id="regCompany" class="field-input" placeholder="SwiftCorp Inc." />
+              </div>
+            </div>
+          </div>
+
+          <div class="field-group">
+            <label class="field-label">Company Email</label>
+            <div class="field-input-wrap">
+              <span class="material-symbols-rounded field-icon">mail</span>
+              <input type="email" id="regEmail" class="field-input" placeholder="name@company.com" autocomplete="email" />
+            </div>
+          </div>
+
+          <div class="field-group">
+            <label class="field-label">Password</label>
+            <div class="field-input-wrap">
+              <span class="material-symbols-rounded field-icon">lock</span>
+              <input type="password" id="regPassword" class="field-input" placeholder="Min 8 characters" autocomplete="new-password" oninput="updateStrength(this.value)" />
+              <button type="button" class="field-eye" onclick="togglePw('regPassword', this)">
+                <span class="material-symbols-rounded">visibility</span>
+              </button>
+            </div>
+            <div class="strength-meter">
+              <div class="strength-bar" id="strengthBar"></div>
+            </div>
+            <span class="strength-label" id="strengthLabel"></span>
+          </div>
+
+          <div class="field-group">
+            <label class="field-label">Role</label>
+            <div class="field-input-wrap field-input-wrap--select">
+              <span class="material-symbols-rounded field-icon">badge</span>
+              <select id="regRole" class="field-input field-select">
+                <option value="operator">Operator</option>
+                <option value="admin">Admin</option>
+                <option value="driver">Driver</option>
+              </select>
+              <span class="material-symbols-rounded field-icon-right">expand_more</span>
+            </div>
+          </div>
+
+          <label class="checkbox-label checkbox-label--tos">
+            <input type="checkbox" id="agreeTerms" />
+            <span>I agree to the <button type="button" class="link-btn">Terms of Service</button> and <button type="button" class="link-btn">Privacy Policy</button></span>
+          </label>
+
+          <button class="auth-btn" id="registerBtn" onclick="handleRegister()">
+            <span class="btn-text">Create Account</span>
+            <span class="material-symbols-rounded btn-icon">arrow_forward</span>
+            <div class="btn-loader" style="display:none"><div class="spinner"></div></div>
+          </button>
+
+          <p class="auth-switch">Already have an account? <button class="link-btn" onclick="switchTab('login')">Log in here →</button></p>
+        </div>
+
+      </div><!-- /form-card -->
+    </div><!-- /right panel -->
+  </div><!-- /auth-layout -->
+
+  <script src="../js/api.js"></script>
+  <script>
+    /* ── Tab switching ──────────────────────────────── */
+    function switchTab(tab) {
+      const isLogin = tab === 'login';
+      document.getElementById('formLogin').style.display    = isLogin ? '' : 'none';
+      document.getElementById('formRegister').style.display = isLogin ? 'none' : '';
+      document.getElementById('tabLogin').classList.toggle('auth-tab--active', isLogin);
+      document.getElementById('tabRegister').classList.toggle('auth-tab--active', !isLogin);
+      document.getElementById('tabIndicator').style.transform = isLogin ? 'translateX(0)' : 'translateX(100%)';
+      clearAlerts();
+    }
+
+    function clearAlerts() {
+      ['loginError','loginSuccess','registerError','registerSuccess'].forEach(id => {
+        const el = document.getElementById(id);
+        el.style.display = 'none';
+        el.textContent = '';
+      });
+    }
+
+    /* ── Show/hide password ─────────────────────────── */
+    function togglePw(id, btn) {
+      const input = document.getElementById(id);
+      const icon  = btn.querySelector('.material-symbols-rounded');
+      const isHidden = input.type === 'password';
+      input.type  = isHidden ? 'text' : 'password';
+      icon.textContent = isHidden ? 'visibility_off' : 'visibility';
+    }
+
+    /* ── Password strength ──────────────────────────── */
+    function updateStrength(val) {
+      let score = 0;
+      if (val.length >= 8)  score++;
+      if (/[A-Z]/.test(val)) score++;
+      if (/[0-9]/.test(val)) score++;
+      if (/[^A-Za-z0-9]/.test(val)) score++;
+
+      const bar   = document.getElementById('strengthBar');
+      const label = document.getElementById('strengthLabel');
+      const levels = ['', 'Weak', 'Fair', 'Good', 'Strong'];
+      const colors = ['', '#ef4444', '#f59e0b', '#3b82f6', '#10b981'];
+      const widths = ['0%', '25%', '50%', '75%', '100%'];
+
+      bar.style.width      = widths[score];
+      bar.style.background = colors[score];
+      label.textContent    = levels[score];
+      label.style.color    = colors[score];
+    }
+
+    /* ── Set loading state ──────────────────────────── */
+    function setLoading(btnId, loading) {
+      const btn    = document.getElementById(btnId);
+      const text   = btn.querySelector('.btn-text');
+      const icon   = btn.querySelector('.btn-icon');
+      const loader = btn.querySelector('.btn-loader');
+      btn.disabled          = loading;
+      text.style.opacity    = loading ? '0' : '1';
+      icon.style.display    = loading ? 'none' : '';
+      loader.style.display  = loading ? 'flex' : 'none';
+    }
+
+    /* ── Show alert ─────────────────────────────────── */
+    function showAlert(id, msg) {
+      const el = document.getElementById(id);
+      el.textContent    = msg;
+      el.style.display  = 'flex';
+    }
+
+    /* ── Save profile to localStorage ──────────────── */
+    function saveProfile(user, name, company) {
+      const profile = { name: name || user.email.split('@')[0], role: user.role, email: user.email, avatar: '', company: company || '' };
+      localStorage.setItem('swift_profile', JSON.stringify(profile));
+    }
+
+    /* ── LOGIN ──────────────────────────────────────── */
+    async function handleLogin() {
+      clearAlerts();
+      const email    = document.getElementById('loginEmail').value.trim();
+      const password = document.getElementById('loginPassword').value;
+
+      if (!email || !password) { showAlert('loginError', 'Please fill in all fields.'); return; }
+
+      setLoading('loginBtn', true);
+      try {
+        const data = await window.AuthAPI.login(email, password);
+        if (data.error) { showAlert('loginError', data.error); return; }
+
+        saveProfile(data.user, '', '');
+        showAlert('loginSuccess', 'Signed in! Redirecting…');
+        setTimeout(() => { window.location.href = 'index.html'; }, 800);
+      } catch (err) {
+        showAlert('loginError', err.message || 'Could not reach server. Check your connection.');
+      } finally {
+        setLoading('loginBtn', false);
+      }
+    }
+
+    /* ── REGISTER ───────────────────────────────────── */
+    async function handleRegister() {
+      clearAlerts();
+      const name    = document.getElementById('regName').value.trim();
+      const company = document.getElementById('regCompany').value.trim();
+      const email   = document.getElementById('regEmail').value.trim();
+      const password= document.getElementById('regPassword').value;
+      const role    = document.getElementById('regRole').value;
+      const agreed  = document.getElementById('agreeTerms').checked;
+
+      if (!name || !email || !password) { showAlert('registerError', 'Please fill in all required fields.'); return; }
+      if (password.length < 8)          { showAlert('registerError', 'Password must be at least 8 characters.'); return; }
+      if (!agreed)                       { showAlert('registerError', 'Please agree to the Terms of Service.'); return; }
+
+      setLoading('registerBtn', true);
+      try {
+        const data = await window.AuthAPI.register(email, password, role);
+        if (data.error) { showAlert('registerError', data.error); return; }
+
+        saveProfile(data.user, name, company);
+        showAlert('registerSuccess', 'Account created! Redirecting…');
+        setTimeout(() => { window.location.href = 'index.html'; }, 800);
+      } catch (err) {
+        showAlert('registerError', err.message || 'Could not reach server. Check your connection.');
+      } finally {
+        setLoading('registerBtn', false);
+      }
+    }
+
+    /* ── DEMO login ─────────────────────────────────── */
+    async function demoLogin() {
+      document.getElementById('loginEmail').value    = 'admin@swiftdelivery.com';
+      document.getElementById('loginPassword').value = 'admin123';
+      await handleLogin();
+    }
+
+    /* ── GUEST view (bypass auth) ───────────────────── */
+    function guestLogin() {
+      localStorage.setItem('token', 'guest');
+      localStorage.setItem('swift_profile', JSON.stringify({ name: 'Guest User', role: 'operator', email: 'guest@demo.com', avatar: '', company: '' }));
+      window.location.href = 'index.html';
+    }
+
+    /* ── Live pulse counter animation ──────────────── */
+    let pulseTarget = 0;
+    let pulseCurrent = 0;
+    function animatePulse(target) {
+      const diff = target - pulseCurrent;
+      const step = Math.ceil(Math.abs(diff) / 40);
+      if (pulseCurrent < target) {
+        pulseCurrent = Math.min(pulseCurrent + step, target);
+      } else {
+        pulseCurrent = Math.max(pulseCurrent - step, target);
+      }
+      document.getElementById('pulseNum').textContent = pulseCurrent.toLocaleString();
+      document.getElementById('pulseBar').style.width = Math.min((pulseCurrent / 2000) * 100, 100) + '%';
+      if (pulseCurrent !== target) requestAnimationFrame(() => animatePulse(target));
+    }
+
+    function tickPulse() {
+      pulseTarget = Math.floor(800 + Math.random() * 600);
+      const pct   = (Math.random() > 0.5 ? '+' : '-') + (Math.random() * 15).toFixed(1) + '%';
+      document.getElementById('pulseDelta').textContent = pct;
+      document.getElementById('pulseDelta').style.color = pct.startsWith('+') ? '#10b981' : '#ef4444';
+      animatePulse(pulseTarget);
+    }
+    tickPulse();
+    setInterval(tickPulse, 4000);
+
+    /* ── Particle generator ─────────────────────────── */
+    (function spawnParticles() {
+      const container = document.getElementById('particles');
+      for (let i = 0; i < 28; i++) {
+        const p = document.createElement('div');
+        p.className = 'particle';
+        p.style.cssText = `
+          left:${Math.random()*100}%;
+          top:${Math.random()*100}%;
+          width:${2 + Math.random()*4}px;
+          height:${2 + Math.random()*4}px;
+          animation-delay:${Math.random()*8}s;
+          animation-duration:${6 + Math.random()*10}s;
+          opacity:${0.2 + Math.random()*0.5};
+        `;
+        container.appendChild(p);
+      }
+    })();
+
+    /* ── Enter key submits ──────────────────────────── */
+    document.addEventListener('keydown', e => {
+      if (e.key !== 'Enter') return;
+      if (document.getElementById('formLogin').style.display !== 'none') handleLogin();
+      else handleRegister();
+    });
+  </script>
+</body>
+</html>

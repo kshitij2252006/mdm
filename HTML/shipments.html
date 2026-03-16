@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SwiftDelivery — Shipments</title>
+  <link rel="stylesheet" href="../Css/base.css" />
+  <link rel="stylesheet" href="../Css/shipments.css" />
+</head>
+<body>
+
+<div class="layout" id="layout">
+
+  <div class="main-wrap" id="main-wrap">
+
+    <div class="content" id="content">
+
+      <!-- Page header -->
+      <div class="ledger-header">
+        <div>
+          <h1 style="font-size:32px;font-weight:700;letter-spacing:-0.025em">Shipment Ledger</h1>
+          <p style="font-size:14px;color:var(--t-secondary);margin-top:4px">Real-time logistical monitoring for active manifests</p>
+        </div>
+        <div class="ledger-header__actions">
+          <button class="btn">
+            <span class="material-symbols-outlined">filter_list</span> Filter
+          </button>
+          <button class="btn">
+            <span class="material-symbols-outlined">calendar_today</span> Oct 12 – Oct 19
+          </button>
+          <button class="btn btn-primary">
+            <span class="material-symbols-outlined">download</span> Export Report
+          </button>
+        </div>
+      </div>
+
+      <!-- Bento stat cards -->
+      <div class="bento-grid" id="bentoGrid"></div>
+
+      <!-- Ledger table -->
+      <div class="ledger-wrap">
+        <div class="ledger-wrap__header">
+          <h3>Shipment Manifest</h3>
+          <div class="ledger-controls">
+            <select>
+              <option>All Statuses</option>
+              <option>In Transit</option>
+              <option>Delivered</option>
+              <option>Delayed</option>
+            </select>
+            <div class="ledger-controls__sep"></div>
+            <button class="clear-btn">Clear Filters</button>
+          </div>
+        </div>
+
+        <div style="overflow-x:auto">
+          <table class="ledger-table">
+            <thead>
+              <tr>
+                <th>Tracking ID</th>
+                <th>Destination</th>
+                <th class="center">Status</th>
+                <th>ETA</th>
+                <th class="right">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="shipmentsTbody"></tbody>
+          </table>
+        </div>
+
+        <div class="pagination">
+          <p class="pagination__info">Showing 1 to 4 of 1,326 shipments</p>
+          <div class="pagination__pages">
+            <button class="page-btn" disabled>
+              <span class="material-symbols-outlined" style="font-size:18px">chevron_left</span>
+            </button>
+            <button class="page-btn active">1</button>
+            <button class="page-btn">2</button>
+            <button class="page-btn">3</button>
+            <span class="page-ellipsis">…</span>
+            <button class="page-btn">45</button>
+            <button class="page-btn">
+              <span class="material-symbols-outlined" style="font-size:18px">chevron_right</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script src="../js/data.js"></script>
+<script src="../js/ui.js"></script>
+<script>
+  let shipmentsData = Array.isArray(DATA?.shipments) ? DATA.shipments : [];
+
+  const BADGE_MAP = {
+    transit:    'badge-transit',
+    in_transit: 'badge-transit',
+    delivered:  'badge-delivered',
+    delayed:    'badge-delayed',
+    processing: 'badge-processing',
+  };
+
+  function buildBento() {
+    const inTransit = shipmentsData.filter((item) => item.status === 'in_transit' || item.status === 'transit').length;
+    const pendingAction = shipmentsData.filter((item) => item.status === 'processing' || item.status === 'delayed').length;
+    const delivered = shipmentsData.filter((item) => item.status === 'delivered').length;
+
+    const grid = document.getElementById('bentoGrid');
+    grid.innerHTML = `
+      <div class="bento-card bento-card--light">
+        <span class="material-symbols-outlined bento-card__icon">local_shipping</span>
+        <div>
+          <p class="bento-card__label">In Transit</p>
+          <p class="bento-card__value">${inTransit}</p>
+        </div>
+        <p class="bento-card__sub">
+          <span class="material-symbols-outlined" style="font-size:16px">trending_up</span>
+          Active shipments right now
+        </p>
+      </div>
+
+      <div class="bento-card bento-card--dark">
+        <div>
+          <p class="bento-card__label">Pending Action</p>
+          <p class="bento-card__value">${pendingAction}</p>
+        </div>
+        <div class="avatar-stack">
+          <div class="avatar-more">${pendingAction}</div>
+        </div>
+      </div>
+
+      <div class="bento-card bento-card--green">
+        <div>
+          <p class="bento-card__label">Successfully Delivered</p>
+          <p class="bento-card__value">${delivered}</p>
+        </div>
+        <p class="bento-card__sub">
+          <span class="material-symbols-outlined" style="font-size:16px">verified</span>
+          Confirmed completed shipments
+        </p>
+      </div>
+    `;
+  }
+
+  async function buildTable() {
+    try {
+      const { shipments } = await ShipmentsAPI.getAll();
+      shipmentsData = (shipments || []).map((s) => ({
+        id: s.tracking_id || s.id,
+        service: s.service || 'Standard Express',
+        city: s.destination || 'Destination',
+        addr: s.destination_address || s.destination || 'Address pending',
+        status: s.status || 'processing',
+        statusLabel: String(s.status || 'processing').replace('_', ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
+        eta: s.eta || 'TBD',
+        etaSub: 'Live update',
+        etaClass: '',
+      }));
+    } catch (_err) {
+      // Keep local fallback values when API/auth is not ready.
+    }
+
+    const tbody = document.getElementById('shipmentsTbody');
+
+    if (!shipmentsData.length) {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="5">
+            <div class="empty-state empty-state--table">
+              <h3>No shipments found</h3>
+              <p>Create your first shipment to populate this ledger.</p>
+            </div>
+          </td>
+        </tr>
+      `;
+      buildBento();
+      return;
+    }
+
+    tbody.innerHTML = shipmentsData.map(s => `
+      <tr onclick="window.location.href='tracking.html?id=${encodeURIComponent(s.id)}'">
+        <td>
+          <p class="td-id">${s.id}</p>
+          <p class="td-service">${s.service}</p>
+        </td>
+        <td>
+          <div class="td-dest__inner">
+            <span class="material-symbols-outlined">location_on</span>
+            <div class="td-dest">
+              <p>${s.city}</p>
+              <small>${s.addr}</small>
+            </div>
+          </div>
+        </td>
+        <td class="td-status">
+          <span class="badge ${BADGE_MAP[s.status]}">${s.statusLabel}</span>
+        </td>
+        <td class="td-eta">
+          <strong>${s.eta}</strong>
+          <small class="${s.etaClass}">${s.etaSub}</small>
+        </td>
+        <td class="td-actions">
+          <div class="row-actions">
+            <button class="icon-action" title="Track">
+              <span class="material-symbols-outlined">map</span>
+            </button>
+            <button class="icon-action" title="Edit">
+              <span class="material-symbols-outlined">edit</span>
+            </button>
+            <button class="icon-action" title="More">
+              <span class="material-symbols-outlined">more_vert</span>
+            </button>
+          </div>
+        </td>
+      </tr>
+    `).join('');
+
+    buildBento();
+  }
+
+  document.addEventListener('DOMContentLoaded', async () => {
+    if (!localStorage.getItem('token')) { window.location.replace('auth.html'); return; }
+    UI.render('shipments', 'Search by ID, recipient, or destination...');
+    await buildTable();
+  });
+</script>
+
+<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+<script src="../js/api.js"></script>
+
+</body>
+</html>

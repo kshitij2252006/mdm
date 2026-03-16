@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SwiftDelivery — Overview</title>
+  <link rel="stylesheet" href="../Css/base.css" />
+  <link rel="stylesheet" href="../Css/dashboard.css" />
+</head>
+<body>
+
+<div class="layout" id="layout">
+
+  <!-- Sidebar injected by ui.js -->
+
+  <div class="main-wrap" id="main-wrap">
+
+    <!-- Topbar injected by ui.js -->
+
+    <div class="content" id="content">
+      <!-- Stats bento -->
+      <div class="stats-grid" id="statsGrid"></div>
+
+      <div class="dashboard-grid">
+
+        <!-- Left: Recent shipments -->
+        <div>
+          <div class="section-header">
+            <h2>Recent Shipments</h2>
+            <button class="view-all">
+              View All
+              <span class="material-symbols-outlined" style="font-size:16px">chevron_right</span>
+            </button>
+          </div>
+          <div class="shipment-list" id="shipmentList"></div>
+        </div>
+
+        <!-- Right: Live + actions + alert -->
+        <div class="right-panel">
+
+          <div class="live-card">
+            <div class="live-card__map-bg"></div>
+            <h3>Live Tracking</h3>
+            <p>Real-time pulse of global fleet</p>
+            <div id="livePulse"></div>
+            <button class="live-card__btn">Expand Fleet View</button>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="../js/data.js"></script>
+<script src="../js/ui.js"></script>
+<script>
+  let recentShipmentsData = Array.isArray(DATA?.recentShipments) ? DATA.recentShipments : [];
+  let liveTrackingData = Array.isArray(DATA?.liveTracking) ? DATA.liveTracking : [];
+
+  const BADGE_MAP = {
+    transit:   'badge-transit',
+    in_transit:'badge-transit',
+    delivered: 'badge-delivered',
+    delayed:   'badge-delayed',
+    processing:'badge-processing',
+  };
+
+  async function buildStats() {
+    const grid = document.getElementById('statsGrid');
+    let summary = {
+      total: DATA?.stats?.activeShipments || 0,
+      in_transit: DATA?.stats?.inTransit || 0,
+      delivered_today: DATA?.stats?.deliveredToday || 0,
+      delayed: DATA?.stats?.issues || 0,
+    };
+
+    try {
+      const { total, in_transit, delivered_today, delayed } = await AnalyticsAPI.getSummary();
+      summary = { total, in_transit, delivered_today, delayed };
+    } catch (_err) {
+      // Keep local fallback values when API/auth is not ready.
+    }
+
+    const cards = [
+      { label: 'Active Shipments', value: summary.total ?? 0,          sub: 'Live volume',     subIcon: 'trending_up', mod: '' },
+      { label: 'Delivered Today',  value: summary.delivered_today ?? 0, sub: 'Updated today',   subIcon: '',            mod: 'metric-card--green' },
+      { label: 'In-Transit',       value: summary.in_transit ?? 0,      sub: 'Live',            subIcon: '',            mod: 'metric-card--accent' },
+      { label: 'Issues',           value: summary.delayed ?? 0,          sub: 'Requires Action', subIcon: '',            mod: 'metric-card--error' },
+    ];
+
+    grid.innerHTML = cards.map(c => `
+      <div class="metric-card ${c.mod}">
+        <span class="metric-card__label">${c.label}</span>
+        <div class="metric-card__value">${c.value}</div>
+        <p class="metric-card__sub">
+          ${c.subIcon ? `<span class="material-symbols-outlined" style="font-size:14px">${c.subIcon}</span>` : ''}
+          ${c.sub}
+        </p>
+      </div>
+    `).join('');
+  }
+
+  async function buildShipments() {
+    const list = document.getElementById('shipmentList');
+    try {
+      const { shipments } = await ShipmentsAPI.getAll({ limit: 3, offset: 0 });
+      recentShipmentsData = (shipments || []).map((s) => ({
+        id: s.tracking_id || s.id,
+        icon: 'package_2',
+        from: s.origin || 'Origin',
+        to: s.destination || 'Destination',
+        status: s.status || 'processing',
+        statusLabel: String(s.status || 'processing').replace('_', ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
+        eta: s.eta || 'ETA pending',
+      }));
+    } catch (_err) {
+      // Keep local fallback values when API/auth is not ready.
+    }
+
+    if (!recentShipmentsData.length) {
+      list.innerHTML = `
+        <div class="empty-state">
+          <h3>No shipments yet</h3>
+          <p>Your first shipment will appear here once it is created.</p>
+        </div>
+      `;
+      return;
+    }
+
+    list.innerHTML = recentShipmentsData.map(s => `
+      <div class="shipment-item" onclick="window.location.href='tracking.html?id=${encodeURIComponent(s.id)}'">
+        <div class="shipment-item__inner">
+          <div class="shipment-item__left">
+            <div class="shipment-icon">
+              <span class="material-symbols-outlined">${s.icon}</span>
+            </div>
+            <div>
+              <p class="shipment-item__id">${s.id}</p>
+              <p class="shipment-item__route">
+                ${s.from}
+                <span class="material-symbols-outlined">arrow_forward</span>
+                ${s.to}
+              </p>
+            </div>
+          </div>
+          <div class="shipment-item__right">
+            <span class="badge ${BADGE_MAP[s.status]}">${s.statusLabel}</span>
+            <p class="shipment-item__eta">${s.eta}</p>
+          </div>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  function buildLivePulse() {
+    const el = document.getElementById('livePulse');
+
+    if (!liveTrackingData.length) {
+      el.innerHTML = `
+        <div class="empty-state empty-state--soft">
+          <h3>No live activity</h3>
+          <p>Live vehicle and route updates will show here.</p>
+        </div>
+      `;
+      return;
+    }
+
+    el.innerHTML = liveTrackingData.map(t => `
+      <div class="live-pulse">
+        <span class="pulse-dot ${t.color}"></span>
+        <span>${t.text}</span>
+      </div>
+    `).join('');
+  }
+
+  document.addEventListener('DOMContentLoaded', async () => {
+    if (!localStorage.getItem('token')) { window.location.replace('auth.html'); return; }
+    UI.render('overview', 'Track a shipment or search...');
+    await buildStats();
+    await buildShipments();
+    buildLivePulse();
+  });
+</script>
+
+<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+<script src="../js/api.js"></script>
+
+</body>
+</html>

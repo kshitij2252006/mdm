@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SwiftDelivery — New Shipment</title>
+  <link rel="stylesheet" href="../Css/base.css" />
+</head>
+<body>
+
+<div class="layout" id="layout">
+  <div class="main-wrap" id="main-wrap">
+    <div class="content" id="content">
+      <div class="page-shell">
+        <div class="page-shell__header">
+          <div>
+            <h1>New Shipment</h1>
+            <p>Create a shipment from the dashboard. If the API is unavailable, the shipment is saved locally and still appears in the UI.</p>
+          </div>
+          <a class="btn" href="shipments.html">Open Ledger</a>
+        </div>
+
+        <form class="form-grid" id="shipmentForm">
+          <section class="form-card">
+            <h2 class="form-card__title">Shipment Details</h2>
+            <div class="field-grid">
+              <div class="field">
+                <label for="trackingId">Tracking ID</label>
+                <input id="trackingId" name="trackingId" type="text" required />
+              </div>
+              <div class="field">
+                <label for="service">Service</label>
+                <select id="service" name="service">
+                  <option>Standard Express</option>
+                  <option>Priority Overnight</option>
+                  <option>Freight LTL</option>
+                </select>
+              </div>
+              <div class="field field--full">
+                <label for="origin">Origin</label>
+                <input id="origin" name="origin" type="text" required />
+              </div>
+              <div class="field field--full">
+                <label for="destination">Destination</label>
+                <input id="destination" name="destination" type="text" required />
+              </div>
+              <div class="field">
+                <label for="eta">Estimated Arrival</label>
+                <input id="eta" name="eta" type="datetime-local" required />
+              </div>
+              <div class="field">
+                <label for="driverId">Driver ID</label>
+                <input id="driverId" name="driverId" type="text" />
+              </div>
+            </div>
+            <div class="form-actions">
+              <p class="status-message" id="shipmentStatus">Fill out the form to create a shipment.</p>
+              <button class="btn btn-primary" type="submit">Create Shipment</button>
+            </div>
+          </section>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="../js/ui.js"></script>
+<script src="../js/api.js"></script>
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    if (!localStorage.getItem('token')) { window.location.replace('auth.html'); return; }
+    UI.render('', 'Search shipments or pages...');
+
+    const status = document.getElementById('shipmentStatus');
+    const form = document.getElementById('shipmentForm');
+    const trackingIdInput = document.getElementById('trackingId');
+    trackingIdInput.value = `SW-${Date.now()}`;
+
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      status.textContent = 'Creating shipment...';
+      status.className = 'status-message';
+
+      try {
+        const result = await ShipmentsAPI.create({
+          tracking_id: document.getElementById('trackingId').value.trim(),
+          origin: document.getElementById('origin').value.trim(),
+          destination: document.getElementById('destination').value.trim(),
+          eta: document.getElementById('eta').value,
+          driver_id: document.getElementById('driverId').value.trim(),
+          service: document.getElementById('service').value,
+        });
+
+        const shipmentId = result && result.shipment ? (result.shipment.tracking_id || result.shipment.id) : document.getElementById('trackingId').value.trim();
+        status.textContent = result && result.local
+          ? 'Shipment saved locally. It will appear in the dashboard and ledger.'
+          : 'Shipment created successfully.';
+        status.className = 'status-message is-success';
+        window.setTimeout(() => {
+          window.location.href = `tracking.html?id=${encodeURIComponent(shipmentId)}`;
+        }, 500);
+      } catch (error) {
+        status.textContent = error.message || 'Unable to create shipment.';
+        status.className = 'status-message is-error';
+      }
+    });
+  });
+</script>
+</body>
+</html>

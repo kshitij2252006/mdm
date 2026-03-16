@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SwiftDelivery — Tracking Detail</title>
+  <link rel="stylesheet" href="../Css/base.css" />
+  <link rel="stylesheet" href="../Css/tracking.css" />
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+    crossorigin=""
+  />
+</head>
+<body>
+
+<div class="layout" id="layout">
+
+  <div class="main-wrap" id="main-wrap">
+
+    <div class="content" id="content">
+
+      <!-- Page header -->
+      <div class="tracking-header" id="trackingHeader"></div>
+
+      <!-- Two-column grid -->
+      <div class="tracking-grid">
+
+        <!-- Left -->
+        <div>
+          <!-- Map -->
+          <div class="map-card">
+            <div class="map-card__map" id="liveMap" aria-label="Live shipment map"></div>
+            <div class="map-eta">
+              <p class="map-eta__label">Estimated Arrival</p>
+              <p class="map-eta__time" id="mapEta">—</p>
+            </div>
+            <div class="map-live-chip" id="mapLiveChip">Connecting live feed...</div>
+            <div class="map-legend" id="mapLegend"></div>
+          </div>
+
+          <!-- Route cards -->
+          <div class="route-cards" id="routeCards"></div>
+        </div>
+
+        <!-- Right -->
+        <div class="right-col">
+
+          <div class="timeline-card">
+            <h2>Shipment Timeline</h2>
+            <div class="timeline" id="timeline"></div>
+          </div>
+
+          <div class="courier-card" id="courierCard"></div>
+
+          <div class="pkg-card" id="pkgCard"></div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="../js/data.js"></script>
+<script src="../js/ui.js"></script>
+<script
+  src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+  integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+  crossorigin=""
+></script>
+<script>
+  let T = DATA.trackingDetail;
+  const FALLBACK_TRACKING_ID = new URLSearchParams(window.location.search).get('id') || '';
+  const BADGE_MAP = { transit: 'badge-transit', in_transit: 'badge-transit', delayed: 'badge-delayed', delivered: 'badge-delivered', processing: 'badge-processing' };
+  const TRACKING_FEED_URL = window.TRACKING_FEED_URL || '';
+  const LIVE_INTERVAL_MS = 5000;
+
+  let map;
+  let vehicleMarker;
+  let routeLine;
+  let liveTimer;
+  let simProgress = 0.2;
+
+  function hasTrackingData() {
+    return Boolean(T && T.id);
+  }
+
+  function getCoords() {
+    const fallback = {
+      origin: [19.076, 72.8777],
+      destination: [12.9716, 77.5946],
+      vehicle: [16.35, 75.24],
+    };
+    if (!T.coords) return fallback;
+    return {
+      origin: Array.isArray(T.coords.origin) ? T.coords.origin : fallback.origin,
+      destination: Array.isArray(T.coords.destination) ? T.coords.destination : fallback.destination,
+      vehicle: Array.isArray(T.coords.vehicle) ? T.coords.vehicle : fallback.vehicle,
+    };
+  }
+
+  async function loadTrackingData() {
+    if (!FALLBACK_TRACKING_ID) return;
+
+    try {
+      const { shipment, timeline } = await ShipmentsAPI.getById(FALLBACK_TRACKING_ID);
+      if (shipment) {
+        T = Object.assign({}, T, {
+          id: shipment.tracking_id || shipment.id || T.id,
+          status: shipment.status || T.status,
+          statusLabel: String(shipment.status || T.status).replace('_', ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
+          title: shipment.destination || T.title,
+          eta: shipment.eta || T.eta,
+          origin: Object.assign({}, T.origin, { name: shipment.origin || T.origin.name }),
+          dest: Object.assign({}, T.dest, { name: shipment.destination || T.dest.name }),
+        });
+      }
+      if (Array.isArray(timeline) && timeline.length) {
+        T.timeline = timeline.map((item) => ({
+          state: item.status === 'delivered' ? 'done' : item.status === 'in_transit' ? 'active' : 'pending',
+          label: item.note || 'Update',
+          sub: item.created_at || '',
+          note: item.note || '',
+        }));
+      }
+    } catch (_err) {
+      // Keep local fallback values when API/auth is not ready.
+    }
+  }
+
+  function setLiveChip(text, theme) {
+    const chip = document.getElementById('mapLiveChip');
+    if (!chip) return;
+    chip.textContent = text;
+    chip.classList.remove('map-live-chip--live', 'map-live-chip--demo', 'map-live-chip--error');
+    if (theme) chip.classList.add(`map-live-chip--${theme}`);
+  }
+
+  function lerp(a, b, t) {
+    return a + (b - a) * t;
+  }
+
+  function setVehicle(lat, lng) {
+    if (!vehicleMarker) return;
+    vehicleMarker.setLatLng([lat, lng]);
+  }
+
+  function stepSimulation(coords) {
+    simProgress += 0.02;
+    if (simProgress >= 1) simProgress = 0;
+    const lat = lerp(coords.origin[0], coords.destination[0], simProgress);
+    const lng = lerp(coords.origin[1], coords.destination[1], simProgress);
+    setVehicle(lat, lng);
+    setLiveChip(`Demo live update ${new Date().toLocaleTimeString()}`, 'demo');
+  }
+
+  async function pollLiveFeed() {
+    if (!TRACKING_FEED_URL) return false;
+    try {
+      const url = `${TRACKING_FEED_URL}?trackingId=${encodeURIComponent(T.id)}`;
+      const res = await fetch(url, { cache: 'no-store' });
+      if (!res.ok) throw new Error(`Feed HTTP ${res.status}`);
+      const payload = await res.json();
+      const lat = Number(payload.lat ?? payload.latitude);
+      const lng = Number(payload.lng ?? payload.longitude);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+        throw new Error('Invalid location payload');
+      }
+      setVehicle(lat, lng);
+      setLiveChip(`Live API update ${new Date().toLocaleTimeString()}`, 'live');
+      return true;
+    } catch (err) {
+      setLiveChip('Live feed unavailable, showing demo movement', 'error');
+      return false;
+    }
+  }
+
+  function startLiveTracking(coords) {
+    const tick = async () => {
+      const isLive = await pollLiveFeed();
+      if (!isLive) stepSimulation(coords);
+    };
+
+    tick();
+    liveTimer = window.setInterval(tick, LIVE_INTERVAL_MS);
+  }
+
+  function initMap() {
+    if (typeof L === 'undefined') {
+      setLiveChip('Map library failed to load', 'error');
+      return;
+    }
+
+    const mapEl = document.getElementById('liveMap');
+    if (!mapEl) return;
+
+    if (map) {
+      map.remove();
+      map = null;
+    }
+
+    const coords = getCoords();
+    map = L.map('liveMap', { zoomControl: true, attributionControl: true });
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '&copy; OpenStreetMap contributors',
+    }).addTo(map);
+
+    if (!hasTrackingData()) {
+      map.setView([20.5937, 78.9629], 5);
+      setLiveChip('Map ready. Select a shipment to start tracking.', 'demo');
+      return;
+    }
+
+    routeLine = L.polyline([coords.origin, coords.destination], {
+      color: '#fd761a',
+      weight: 5,
+      opacity: 0.8,
+      dashArray: '10 8',
+    }).addTo(map);
+
+    L.circleMarker(coords.origin, {
+      radius: 8,
+      color: '#ffffff',
+      weight: 2,
+      fillColor: '#4edea3',
+      fillOpacity: 1,
+    }).addTo(map).bindTooltip(T.mapLegend.origin, { direction: 'top' });
+
+    L.circleMarker(coords.destination, {
+      radius: 8,
+      color: '#ffffff',
+      weight: 2,
+      fillColor: '#131b2e',
+      fillOpacity: 1,
+    }).addTo(map).bindTooltip(T.mapLegend.active, { direction: 'top' });
+
+    vehicleMarker = L.circleMarker(coords.vehicle, {
+      radius: 10,
+      color: '#ffffff',
+      weight: 3,
+      fillColor: '#fd761a',
+      fillOpacity: 1,
+    }).addTo(map).bindTooltip('Shipment', { permanent: false });
+
+    map.fitBounds(routeLine.getBounds(), { padding: [36, 36] });
+    startLiveTracking(coords);
+  }
+
+  function buildHeader() {
+    document.getElementById('trackingHeader').innerHTML = `
+      <div>
+        <div class="tracking-header__status">
+          <span class="badge ${BADGE_MAP[T.status]}">${T.statusLabel}</span>
+          <span class="tracking-header__id">${T.id}</span>
+        </div>
+        <h1>${T.title}</h1>
+      </div>
+      <div class="tracking-header__actions">
+        <button class="btn">Download Label</button>
+        <button class="btn btn-primary">Manage Order</button>
+      </div>
+    `;
+  }
+
+  function buildMap() {
+    document.getElementById('mapEta').textContent = T.eta;
+
+    if (!hasTrackingData()) {
+      document.getElementById('mapLegend').innerHTML = '';
+      return;
+    }
+
+    document.getElementById('mapLegend').innerHTML = `
+      <div class="map-legend__item">
+        <span class="map-legend__dot" style="background:var(--c-green)"></span>
+        ${T.mapLegend.origin}
+      </div>
+      <div class="map-legend__sep"></div>
+      <div class="map-legend__item">
+        <span class="map-legend__dot" style="background:var(--c-accent)"></span>
+        ${T.mapLegend.active}
+      </div>
+    `;
+  }
+
+  function buildRouteCards() {
+    if (!hasTrackingData()) {
+      document.getElementById('routeCards').innerHTML = `
+        <div class="empty-state">
+          <h3>No route details yet</h3>
+          <p>Origin and destination will appear after you open a shipment.</p>
+        </div>
+      `;
+      return;
+    }
+
+    document.getElementById('routeCards').innerHTML = `
+      <div class="route-card route-card--origin">
+        <p class="section-label">Origin</p>
+        <p>${T.origin.name}<br/>${T.origin.address.replace('\n','<br/>')}</p>
+      </div>
+      <div class="route-card route-card--dest">
+        <p class="section-label">Destination</p>
+        <p>${T.dest.name}<br/>${T.dest.address.replace('\n','<br/>')}</p>
+      </div>
+    `;
+  }
+
+  function buildTimeline() {
+    const el = document.getElementById('timeline');
+
+    if (!T.timeline.length) {
+      el.innerHTML = `
+        <div class="empty-state empty-state--soft">
+          <h3>No timeline yet</h3>
+          <p>Status updates will appear here after the shipment is created.</p>
+        </div>
+      `;
+      return;
+    }
+
+    el.innerHTML = T.timeline.map(step => `
+      <div class="timeline-step">
+        <div class="timeline-dot ${step.state}"></div>
+        <p style="${step.state==='pending'?'color:var(--t-muted)':''}">${step.label}</p>
+        ${step.note ? `<p class="note">${step.note}</p>` : ''}
+        <p class="sub">${step.sub}</p>
+      </div>
+    `).join('');
+  }
+
+  function buildCourier() {
+    if (!hasTrackingData()) {
+      document.getElementById('courierCard').innerHTML = `
+        <div class="empty-state empty-state--soft">
+          <h3>No courier assigned</h3>
+          <p>Courier details will show here once a shipment is scheduled.</p>
+        </div>
+      `;
+      return;
+    }
+
+    const c = T.courier;
+    document.getElementById('courierCard').innerHTML = `
+      <p class="section-label">Assigned Courier</p>
+      <div class="courier-profile">
+        <div class="courier-avatar"><img src="${c.avatar}" alt="${c.name}" /></div>
+        <div>
+          <p class="courier-name">${c.name}</p>
+          <div class="courier-rating">
+            <span class="material-symbols-outlined star" style="font-variation-settings:'FILL' 1">star</span>
+            <span class="val">${c.rating}</span>
+            <span class="cnt">(${c.reviews})</span>
+          </div>
+        </div>
+      </div>
+      <div class="courier-btns">
+        <button class="courier-btn courier-btn--call">
+          <span class="material-symbols-outlined">call</span> Call
+        </button>
+        <button class="courier-btn courier-btn--msg">
+          <span class="material-symbols-outlined">chat_bubble</span> Message
+        </button>
+      </div>
+    `;
+  }
+
+  function buildPkg() {
+    if (!hasTrackingData()) {
+      document.getElementById('pkgCard').innerHTML = `
+        <div class="empty-state empty-state--soft">
+          <h3>No package data yet</h3>
+          <p>Weight, dimensions, and service level will appear here.</p>
+        </div>
+      `;
+      return;
+    }
+
+    const p = T.pkg;
+    document.getElementById('pkgCard').innerHTML = `
+      <p class="section-label" style="margin-bottom:16px">Package Details</p>
+      <div class="pkg-row"><span class="key">Weight</span><span class="val">${p.weight}</span></div>
+      <div class="pkg-row"><span class="key">Dimensions</span><span class="val">${p.dimensions}</span></div>
+      <div class="pkg-row"><span class="key">Service</span><span class="val">${p.service}</span></div>
+    `;
+  }
+
+  document.addEventListener('DOMContentLoaded', async () => {
+    if (!localStorage.getItem('token')) { window.location.replace('auth.html'); return; }
+    UI.render('tracking', 'Search tracking numbers...');
+    await loadTrackingData();
+    buildHeader();
+    buildMap();
+    initMap();
+    buildRouteCards();
+    buildTimeline();
+    buildCourier();
+    buildPkg();
+
+    try {
+      if (!hasTrackingData()) return;
+      const eta = T.eta;
+      Tracking.watch(T.id, ({ lat, lng }) => {
+        if (Number.isFinite(Number(lat)) && Number.isFinite(Number(lng))) {
+          setVehicle(Number(lat), Number(lng));
+        }
+        document.getElementById('mapEta').textContent = eta;
+      });
+    } catch (_err) {
+      // Socket live updates are optional in local/offline mode.
+    }
+  });
+
+  window.addEventListener('beforeunload', () => {
+    if (liveTimer) window.clearInterval(liveTimer);
+  });
+</script>
+
+<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+<script src="../js/api.js"></script>
+
+</body>
+</html>

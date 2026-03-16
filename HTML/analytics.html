@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SwiftDelivery — Analytics</title>
+  <link rel="stylesheet" href="../Css/base.css" />
+  <link rel="stylesheet" href="../Css/analytics.css" />
+</head>
+<body>
+
+<div class="layout" id="layout">
+
+  <div class="main-wrap" id="main-wrap">
+
+    <div class="content" id="content">
+
+      <!-- Page header -->
+      <div class="page-header">
+        <p class="page-header__eyebrow">Performance Metrics</p>
+        <h1>The Kinetic Ledger</h1>
+      </div>
+
+      <!-- KPI grid -->
+      <div class="kpi-grid" id="kpiGrid"></div>
+
+      <!-- Viz: bar chart + heatmap -->
+      <div class="viz-grid">
+
+        <div class="chart-card">
+          <div class="chart-card__header">
+            <div>
+              <h3>Delivery Volume</h3>
+              <p>Weekly distribution across logistics hubs</p>
+            </div>
+            <div class="period-toggle">
+              <button class="period-btn period-btn--inactive">Daily</button>
+              <button class="period-btn period-btn--active">Weekly</button>
+            </div>
+          </div>
+          <div class="bar-chart" id="barChart"></div>
+        </div>
+
+        <div class="heatmap-card">
+          <h3>Regional Heatmap</h3>
+          <p>High-density delivery zones</p>
+          <div class="heatmap-canvas">
+            <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/8/80/World_map_-_low_resolution.svg/1280px-World_map_-_low_resolution.svg.png" alt="World map" />
+            <div class="heatmap-blob heatmap-blob--1"></div>
+            <div class="heatmap-blob heatmap-blob--2"></div>
+            <div class="heatmap-blob heatmap-blob--3"></div>
+          </div>
+          <div class="heatmap-legend">
+            <div class="heatmap-legend-row">
+              <span>North India</span>
+              <span class="heatmap-tag heatmap-tag--peak">Peak</span>
+            </div>
+            <div class="heatmap-legend-row">
+              <span>South India</span>
+              <span class="heatmap-tag heatmap-tag--steady">Steady</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Route efficiency -->
+      <div class="route-header">
+        <h3>Route Efficiency Detail</h3>
+        <button class="download-btn">
+          Download Report
+          <span class="material-symbols-outlined">download</span>
+        </button>
+      </div>
+      <div class="route-list" id="routeList"></div>
+
+    </div>
+  </div>
+</div>
+
+<script src="../js/data.js"></script>
+<script src="../js/ui.js"></script>
+<script>
+  function buildKpis() {
+    const grid = document.getElementById('kpiGrid');
+    grid.innerHTML = DATA.analytics.kpis.map(k => `
+      <div class="kpi-card kpi-card--${k.theme}">
+        <div class="kpi-card__header">
+          <span class="kpi-card__label">${k.label}</span>
+          <span class="material-symbols-outlined kpi-card__icon kpi-card__icon--${k.iconClass}">${k.icon}</span>
+        </div>
+        <div>
+          <p class="kpi-card__value">${k.value}</p>
+          <p class="kpi-card__sub kpi-card__sub--${k.subClass}">${k.sub}</p>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  function buildBarChart() {
+    const chart = document.getElementById('barChart');
+    chart.innerHTML = DATA.analytics.barChart.map(b => `
+      <div class="bar-wrap ${b.highlight ? 'highlight' : ''}">
+        <div class="bar" style="height:${b.pct * 2}px"></div>
+        <span class="bar-label">${b.day}</span>
+      </div>
+    `).join('');
+  }
+
+  function buildRoutes() {
+    const list = document.getElementById('routeList');
+
+    if (!DATA.analytics.routes.length) {
+      list.innerHTML = `
+        <div class="empty-state">
+          <h3>No route analytics yet</h3>
+          <p>Route performance will appear once shipments begin moving.</p>
+        </div>
+      `;
+      return;
+    }
+
+    list.innerHTML = DATA.analytics.routes.map(r => `
+      <div class="route-item route-item--${r.theme}">
+        <div class="route-item__left">
+          <div class="route-icon">
+            <span class="material-symbols-outlined">${r.icon}</span>
+          </div>
+          <div>
+            <p class="route-item__name">${r.name}</p>
+            <p class="route-item__type">${r.type}</p>
+          </div>
+        </div>
+        <div class="route-item__right">
+          <div class="route-stat">
+            <p class="route-stat__label">Success</p>
+            <p class="route-stat__value route-stat__value--${r.barClass === 'green' ? 'green' : r.barClass === 'accent' ? 'accent' : ''}">${r.success}</p>
+          </div>
+          <div class="route-stat">
+            <p class="route-stat__label">Latency</p>
+            <p class="route-stat__value">${r.latency}</p>
+          </div>
+          <div class="route-bar-wrap">
+            <div class="route-bar route-bar--${r.barClass}" style="width:${r.bar}%"></div>
+          </div>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    if (!localStorage.getItem('token')) { window.location.replace('auth.html'); return; }
+    UI.render('analytics', 'Search analytics or tracking IDs...');
+    buildKpis();
+    buildBarChart();
+    buildRoutes();
+  });
+</script>
+
+<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+<script src="../js/api.js"></script>
+
+</body>
+</html>
